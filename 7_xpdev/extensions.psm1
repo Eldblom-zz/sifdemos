@@ -1,0 +1,1 @@
+Register-SitecoreInstallExtension -Command Rename-Item -As Rename -Type Task

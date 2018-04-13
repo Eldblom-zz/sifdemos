@@ -1,0 +1,142 @@
+{
+    "Parameters": {
+        "Prefix": {
+            "Type": "string",
+            "Description": "Prefix used for sites, solr, databases etc"
+        },
+        "SolrRoot": {
+            "Type": "string",
+            "Description": "The file path to the Solr instance."
+        },
+        "SolrService": {
+            "Type": "string",
+            "Description": "The name of the Solr service."
+        },
+        "SqlAdminUser": {
+            "Type": "string",
+            "DefaultValue": "sa",
+            "Description": "The Sql admin user account to use when installing databases."
+        },
+        "SqlAdminPassword": {
+            "Type": "string",
+            "DefaultValue": "12345",
+            "Description": "The Sql admin password to use when installing databases."
+        },
+        "SqlServer": {
+            "Type": "string",
+            "DefaultValue": ".\\SQL2016",
+            "Description": "The Sql Server where databases will be installed."
+        }
+    },
+    "Variables": {
+        "All.With.Prefix": "[concat(parameter('Prefix'),'*')]",
+        "Install.Path": "[joinpath(environment('SystemDrive'), 'inetpub', 'wwwroot',variable('All.With.Prefix'))]",
+        "Sql.ConnectionString": "[sqlconnectionstring(parameter('SqlServer'), '', parameter('SqlAdminUser'), parameter('SqlAdminPassword'))]",
+        "Sql.DropDatabasesScript": "[resolvepath('dropdatabases.sql')]",
+        "Solr.Server":      "[joinpath(resolvepath(parameter('SolrRoot')), 'server', 'solr')]",
+
+        // The names of the cores to create.
+        "Core.Name":        "[concat(parameter('Prefix'), '_core_index')]",
+        "Master.Name":      "[concat(parameter('Prefix'), '_master_index')]",
+        "Web.Name":         "[concat(parameter('Prefix'), '_web_index')]",
+        "MD.Master.Name":   "[concat(parameter('Prefix'), '_marketingdefinitions_master')]",
+        "MD.Web.Name":      "[concat(parameter('Prefix'), '_marketingdefinitions_web')]",
+        "MA.Master.Name":   "[concat(parameter('Prefix'), '_marketing_asset_index_master')]",
+        "MA.Web.Name":      "[concat(parameter('Prefix'), '_marketing_asset_index_web')]",
+        "Testing.Name":     "[concat(parameter('Prefix'), '_testing_index')]",
+        "Suggested.Name":   "[concat(parameter('Prefix'), '_suggested_test_index')]",
+        "FXM.Master.Name":  "[concat(parameter('Prefix'), '_fxm_master_index')]",
+        "FXM.Web.Name":     "[concat(parameter('Prefix'), '_fxm_web_index')]",
+
+        // The destination paths of the cores to remove.
+        "Core.Root":        "[joinpath(variable('Solr.Server'), variable('Core.Name'))]",
+        "Master.Root":      "[joinpath(variable('Solr.Server'), variable('Master.Name'))]",
+        "Web.Root":         "[joinpath(variable('Solr.Server'), variable('Web.Name'))]",
+        "MD.Master.Root":   "[joinpath(variable('Solr.Server'), variable('MD.Master.Name'))]",
+        "MD.Web.Root":      "[joinpath(variable('Solr.Server'), variable('MD.Web.Name'))]",
+        "MA.Master.Root":   "[joinpath(variable('Solr.Server'), variable('MA.Master.Name'))]",
+        "MA.Web.Root":      "[joinpath(variable('Solr.Server'), variable('MA.Web.Name'))]",
+        "Testing.Root":     "[joinpath(variable('Solr.Server'), variable('Testing.Name'))]",
+        "Suggested.Root":   "[joinpath(variable('Solr.Server'), variable('Suggested.Name'))]",
+        "FXM.Master.Root":  "[joinpath(variable('Solr.Server'), variable('FXM.Master.Name'))]",
+        "FXM.Web.Root":     "[joinpath(variable('Solr.Server'), variable('FXM.Web.Name'))]"
+    },
+    "Tasks": {
+        "RemoveWebsites": {
+            "Type": "RemoveWebsite",
+            "Params": {
+                "Name": "[variable('All.With.Prefix')]"
+            }
+        },
+        "RemoveAppPools": {
+            "Type": "RemoveWebAppPool",
+            "Params": {
+                "Name": "[variable('All.With.Prefix')]"
+            }
+        },
+        "RemoveServices": {
+            "Type": "RemoveService",
+            "Params": {
+                "Name": "[variable('All.With.Prefix')]"
+            }
+        },
+        "RemoveInstalledContent": {
+            "Type": "Remove",
+            "Params": {
+                "Path": "[variable('Install.Path')]",
+                "Recurse": true
+            }
+        },
+        "StopSolr": {
+            // Stops the Solr service if it is running.
+            "Type": "ManageService",
+            "Params":{
+                "Name": "[parameter('SolrService')]",
+                "Status": "Stopped",
+                "PostDelay": 1000
+            }
+        },
+        "CleanCores": {
+            // Creates/clears core paths.
+            "Type": "EnsurePath",
+            "Params":{
+                "Clean": [
+                    "[variable('Core.Root')]",
+                    "[variable('Master.Root')]",
+                    "[variable('Web.Root')]",
+                    "[variable('MD.Master.Root')]",
+                    "[variable('MD.Web.Root')]",
+                    "[variable('MA.Master.Root')]",
+                    "[variable('MA.Web.Root')]",
+                    "[variable('Testing.Root')]",
+                    "[variable('Suggested.Root')]",
+                    "[variable('FXM.Master.Root')]",
+                    "[variable('FXM.Web.Root')]"
+                ]
+            }
+        },
+        "StartSolr": {
+            // Starts the Solr service.
+            "Type": "ManageService",
+            "Params":{
+                "Name": "[parameter('SolrService')]",
+                "Status": "Running",
+                "PostDelay": 8000
+            }
+        },
+        "RemoveDatabases": {
+            "Type": "Sql",
+            "Params": {
+                "InputFile": "[variable('Sql.DropDatabasesScript')]",
+                "ConnectionString": "[variable('Sql.ConnectionString')]",
+                "Variable": "[concat('prefix=', parameter('prefix'), '%')]",
+                "OutputSqlErrors": true,
+                "Verbose": true
+            }
+        }
+    },
+    "Modules": [
+        "SqlServer",
+        "..\\5_uninstall\\extensions.psm1"
+    ]
+}

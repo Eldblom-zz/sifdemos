@@ -1,0 +1,105 @@
+﻿// -------------------------------------------------------------------------- //
+//       Sitecore Install Framework - Sitecore XM1-scalabiliy Configuration   //
+//                                                                            //
+//  Run this configuration to set up scalability on a XP1 with two CD servers //
+//                                                                            //
+//  NOTE: Only single line comments are accepted in configurations.           //
+// -------------------------------------------------------------------------- //
+
+{
+    "Parameters": {
+        // Parameters are values that may be passed when Install-SitecoreConfiguration is called.
+        // Parameters must declare a Type and may declare a DefaultValue and Description.
+        // Parameters with no DefaultValue are required when Install-SitecoreConfiguration is called.
+
+        "RoleType": {
+            "Type": "string",
+            "DefaultValue": "cd",
+            "Description": "The type of role - 'cd' or 'cm' allowed"
+        },
+        "SiteName": {
+            "Type": "string",
+            "Description": "The name of the site."
+        },
+        "RedisUrl": {
+            "Type": "string",
+            "DefaultValue": "127.0.0.1:6379",
+            "Description": "The url for Redis."
+        }
+    },
+    "Variables": {
+        // Variables are values calculated in a configuration.
+        // They can reference Parameters, other Variables, and config functions.
+
+        // The sites full path on disk
+        "Site.PhysicalPath": "[joinpath(environment('SystemDrive'), 'inetpub', 'wwwroot', parameter('SiteName'))]"
+    },
+    "Tasks": {
+        // Tasks are separate units of work in a configuration.
+        // Each task is an action that will be completed when Install-SitecoreConfiguration is called.
+        // By default, tasks are applied in the order they are declared.
+        // Tasks may reference Parameters, Variables, and config functions.
+
+        "EnableScalability": {
+            // Enables scalability on the site
+            "Type": "Copy",
+            "Params": [
+                { 
+                    "Source": "[joinpath(variable('Site.PhysicalPath'), 'App_Config/Include/Examples/ScalabilitySettings.config.example')]", 
+                    "Destination": "[joinpath(variable('Site.PhysicalPath'), 'App_Config/Environment/ScalabilitySettings.config')]" 
+                }
+            ]
+        },
+        "SetPrivateSessionStateProvider": {
+            // Configures the private session state provider
+            "Type": "SetXml",
+            "Params": [
+                { 
+                    "FilePath": "[joinpath(variable('Site.PhysicalPath'), 'App_Config/connectionstrings.config')]", 
+                    "Xpath":"/connectionStrings", 
+                    "Element": "add",
+                    "Attributes": {"connectionString": "[parameter('RedisUrl')]", "name":"session"} 
+                },
+                {
+                    "FilePath": "[joinpath(variable('Site.PhysicalPath'), 'web.config')]", 
+                    "Xpath":"/configuration/system.web/sessionState", 
+                    "Attributes": {"mode": "Custom", "customProvider":"redis"} 
+                },
+                {
+                    "FilePath": "[joinpath(variable('Site.PhysicalPath'), 'web.config')]", 
+                    "Xpath":"/configuration/system.web/sessionState/providers/add[@name='redis']", 
+                    "Attributes": {"applicationName": "[concat(parameter('SiteName'),'_private')]"}
+                }
+            ]
+        },
+        "SetSharedSessionStateProvider": {
+            // Configures the shared session state provider
+            "Type": "SetXml",
+            "Params": [
+                { 
+                    "FilePath": "[joinpath(variable('Site.PhysicalPath'), 'App_Config/connectionstrings.config')]", 
+                    "Xpath":"/connectionStrings", 
+                    "Element": "add",
+                    "Attributes": {"connectionString": "[parameter('RedisUrl')]", "name":"sharedSession"} 
+                },
+                {
+                    "FilePath": "[joinpath(variable('Site.PhysicalPath'), ' App_Config/Sitecore/Marketing.Tracking/Sitecore.Analytics.Tracking.config')]", 
+                    "Xpath":"/configuration/sitecore/tracking/sharedSessionState", 
+                    "Attributes": {"defaultProvider": "redis"} 
+                },
+                {
+                    "FilePath": "[joinpath(variable('Site.PhysicalPath'), ' App_Config/Sitecore/Marketing.Tracking/Sitecore.Analytics.Tracking.config')]", 
+                    "Xpath":"/configuration/sitecore/tracking/sharedSessionState/providers/add[@name='InProc']", 
+                    "Attributes": {
+                        "name": "redis",
+                        "type": "Sitecore.SessionProvider.Redis.RedisSessionStateProvider, Sitecore.SessionProvider.Redis",
+                        "connectionString": "sharedSession",
+                        "pollingInterval": "2",
+                        "applicationName": "shared"
+                    } 
+                }
+            ],
+            "Skip": "[equal(parameter('RoleType'),'cm')]"
+        }
+    }
+}

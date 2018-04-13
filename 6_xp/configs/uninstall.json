@@ -1,0 +1,106 @@
+{
+    "Parameters": {
+        "Prefix": {
+            "Type": "string",
+            "Description": "Prefix used for sites, solr, databases etc"
+        },
+        "SolrRoot": {
+            "Type": "string",
+            "Description": "The file path to the Solr instance."
+        },
+        "SolrService": {
+            "Type": "string",
+            "Description": "The name of the Solr service."
+        },
+        "SqlAdminUser": {
+            "Type": "string",
+            "DefaultValue": "sa",
+            "Description": "The Sql admin user account to use when installing databases."
+        },
+        "SqlAdminPassword": {
+            "Type": "string",
+            "DefaultValue": "12345",
+            "Description": "The Sql admin password to use when installing databases."
+        },
+        "SqlServer": {
+            "Type": "string",
+            "DefaultValue": ".\\SQL2016",
+            "Description": "The Sql Server where databases will be installed."
+        }
+    },
+    "Variables": {
+        "All.With.Prefix": "[concat(parameter('Prefix'),'*')]",
+        "Install.Path": "[joinpath(environment('SystemDrive'), 'inetpub', 'wwwroot',variable('All.With.Prefix'))]",
+        "Sql.ConnectionString": "[sqlconnectionstring(parameter('SqlServer'), '', parameter('SqlAdminUser'), parameter('SqlAdminPassword'))]",
+        "Sql.DropDatabasesScript": "[resolvepath('..\\5_uninstall\\dropdatabases.sql')]",
+        "Solr.Server": "[joinpath(resolvepath(parameter('SolrRoot')), 'server', 'solr')]",
+        "Solr.Cores": "[joinpath(variable('Solr.Server'), variable('All.With.Prefix'))]"
+    },
+    "Tasks": {
+        "RemoveWebsites": {
+            "Type": "RemoveWebsite",
+            "Params": {
+                "Name": "[variable('All.With.Prefix')]"
+            }
+        },
+        "RemoveAppPools": {
+            "Type": "RemoveWebAppPool",
+            "Params": {
+                "Name": "[variable('All.With.Prefix')]"
+            }
+        },
+        "RemoveServices": {
+            "Type": "RemoveService",
+            "Params": {
+                "Name": "[variable('All.With.Prefix')]"
+            }
+        },
+        "RemoveInstalledContent": {
+            "Type": "Remove",
+            "Params": {
+                "Path": "[variable('Install.Path')]",
+                "Recurse": true
+            }
+        },
+        "StopSolr": {
+            // Stops the Solr service if it is running.
+            "Type": "ManageService",
+            "Params":{
+                "Name": "[parameter('SolrService')]",
+                "Status": "Stopped",
+                "PostDelay": 1000
+            }
+        },
+        "CleanCores": {
+            // Creates/clears core paths.
+            "Type": "Remove",
+            "Params":{
+                "Path": "[variable('Solr.Cores')]",
+                "Recurse": true
+            }
+        },
+        "StartSolr": {
+            // Starts the Solr service.
+            "Type": "ManageService",
+            "Params":{
+                "Name": "[parameter('SolrService')]",
+                "Status": "Running",
+                "PostDelay": 8000
+            }
+        },
+        "RemoveDatabases": {
+            "Type": "Sql",
+            "Params": {
+                "InputFile": "[variable('Sql.DropDatabasesScript')]",
+                "ConnectionString": "[variable('Sql.ConnectionString')]",
+                "Variable": "[concat('prefix=', parameter('prefix'), '%')]",
+                "OutputSqlErrors": true,
+                "Verbose": true
+            }
+        }
+    },
+    "Modules": [
+        "SqlServer",
+        "..\\5_uninstall\\extensions.psm1"
+    ]
+}

@@ -1,0 +1,178 @@
+{
+    "Parameters":{
+        "Package":{
+            "Type": "string",
+            "Description": "The path to the zip archive of the service."
+        },
+        "SqlDbPrefix": {
+            "Type": "string",
+            "Description": "The prefix used for all Sql databases."
+        },
+        "SitePath":{
+            "Type": "string",
+            "DefaultValue": "c:\\inetpub\\wwwroot",
+            "Description": "The root path where the service is to be installed."
+        },
+        "SiteName":{
+            "Type": "string",
+            "DefaultValue": "sc.publishing",
+            "Description": "The name of the publishing service site."
+        },
+        "Port":{
+            "Type": "int",
+            "DefaultValue": "80",
+            "Description": "The port for the publishing service site."
+        },
+        "AppPoolName":{
+            "Type": "string",
+            "Reference": "SiteName",
+            "Description": "The name of the publishing service app pool."
+        },
+        "SqlServer": {
+            "Type": "string",
+            "DefaultValue": ".\\SQLSERVER",
+            "Description": "The Sql Server where databases will be installed."
+        },
+        "SqlAdminUser": {
+            "Type": "string",
+            "DefaultValue": "sa",
+            "Description": "The Sql admin user account to use when installing databases."
+        },
+        "SqlAdminPassword": {
+            "Type": "string",
+            "DefaultValue": "12345",
+            "Description": "The Sql admin password to use when installing databases."
+        },
+        "SqlCoreUser": {
+            "Type": "string",
+            "DefaultValue": "coreuser",
+            "Description": "The Sql user for the Core connection string in Sitecore."
+        },
+        "SqlCorePassword": {
+            "Type": "string",
+            "DefaultValue": "Test12345",
+            "Description": "The Sql password for the Core connection string in Sitecore."
+        },
+        "SqlMasterUser": {
+            "Type": "string",
+            "DefaultValue": "masteruser",
+            "Description": "The Sql user for the master connection string in Sitecore."
+        },
+        "SqlMasterPassword": {
+            "Type": "string",
+            "DefaultValue": "Test12345",
+            "Description": "The Sql password for the master connection string in Sitecore."
+        },
+        "SqlWebUser": {
+            "Type": "string",
+            "DefaultValue": "webuser",
+            "Description": "The Sql user for the Web connection string in Sitecore."
+        },
+        "SqlWebPassword": {
+            "Type": "string",
+            "DefaultValue": "Test12345",
+            "Description": "The Sql password for the Web connection string in Sitecore."
+        }
+    },
+    "Variables":{
+        "Full.SitePath": "[joinpath(parameter('SitePath'),parameter('SiteName'))]",
+        "Host.Exe": "[joinpath(variable('Full.SitePath'), 'Sitecore.Framework.Publishing.Host')]",
+        "Sql.CoreDb": "[concat(parameter('SqlDbPrefix'), '_Core')]",
+        "Sql.MasterDb": "[concat(parameter('SqlDbPrefix'), '_Master')]",
+        "Sql.WebDb": "[concat(parameter('SqlDbPrefix'), '_Web')]",
+        "Sql.Core": "[sqlconnectionstring(parameter('SqlServer'), variable('Sql.CoreDb'), parameter('SqlCoreUser'), parameter('SqlCorePassword'))]",
+        "Sql.Master": "[sqlconnectionstring(parameter('SqlServer'), variable('Sql.MasterDb'), parameter('SqlMasterUser'), parameter('SqlMasterPassword'))]",
+        "Sql.Web": "[sqlconnectionstring(parameter('SqlServer'), variable('Sql.WebDb'), parameter('SqlWebUser'), parameter('SqlWebPassword'))]",
+        "Sql.Core.Admin": "[sqlconnectionstring(parameter('SqlServer'), variable('Sql.CoreDb'), parameter('SqlAdminUser'), parameter('SqlAdminPassword'))]",
+        "Sql.Master.Admin": "[sqlconnectionstring(parameter('SqlServer'), variable('Sql.MasterDb'), parameter('SqlAdminUser'), parameter('SqlAdminPassword'))]",
+        "Sql.Web.Admin": "[sqlconnectionstring(parameter('SqlServer'), variable('Sql.WebDb'), parameter('SqlAdminUser'), parameter('SqlAdminPassword'))]"
+    },
+    "Tasks":{
+        "EnsurePath":{
+            "Type": "EnsurePath",
+            "Params":{
+                "Clean": "[variable('Full.SitePath')]"
+            }
+        },
+        "UnpackService":{
+            "Type": "ExpandArchive",
+            "Params":{
+                "Path": "[parameter('Package')]",
+                "DestinationPath": "[variable('Full.SitePath')]",
+                "Force": true
+            }
+        },
+        "ConfigureConnectionStrings":{
+            "Type": "Command",
+            "Params":[
+                {
+                    "Path": "[variable('Host.Exe')]",
+                    "Arguments": [ "configuration", "setconnectionstring", "core", "[variable('Sql.Core')]"]
+                },
+                {
+                    "Path": "[variable('Host.Exe')]",
+                    "Arguments": [ "configuration", "setconnectionstring", "master", "[variable('Sql.Master')]"]
+                },
+                {
+                    "Path": "[variable('Host.Exe')]",
+                    "Arguments": [ "configuration", "setconnectionstring", "web", "[variable('Sql.Web')]"]
+                }
+            ]
+        },
+        "ConfigureAdminConnectionStrings":{
+            "Type": "Command",
+            "Params":[
+                {
+                    "Path": "[variable('Host.Exe')]",
+                    "Arguments": [ "configuration", "setconnectionstring", "core", "[variable('Sql.Core.Admin')]", "-e", "development"]
+                },
+                {
+                    "Path": "[variable('Host.Exe')]",
+                    "Arguments": [ "configuration", "setconnectionstring", "master", "[variable('Sql.Master.Admin')]", "-e", "development"]
+                },
+                {
+                    "Path": "[variable('Host.Exe')]",
+                    "Arguments": [ "configuration", "setconnectionstring", "web", "[variable('Sql.Web.Admin')]", "-e", "development"]
+                }
+            ]
+        },
+        "ConfigureInstanceName":{
+            "Type": "Command",
+            "Params": {
+                "Path": "[variable('Host.Exe')]",
+                "Arguments": [ "configuration", "set", "Sitecore:Publishing:InstanceName", "-v", "[parameter('SiteName')]"]
+            }
+        },
+        "UpdateSchemas":{
+            "Type": "Command",
+            "Params": {
+                "Path": "[variable('Host.Exe')]",
+                "Arguments": [ "schema", "upgrade", "--force", "-e", "development"]
+            }
+        },
+        "FixACL":{
+            "Type": "FilePermissions",
+            "Params": {
+                "Path": "[variable('Full.SitePath')]",
+                "Rights": []
+            }
+        },
+        "InstallToIIS":{
+            "Type": "Command",
+            "Params": {
+                "Path": "[variable('Host.Exe')]",
+                "Arguments": [
+                    "iis", "install",
+                    "-s", "[parameter('SiteName')]",
+                    "-a", "[parameter('AppPoolName')]",
+                    "-p", "[parameter('Port')]",
+                    "--hosts",
+                    "--force"
+                ]
+            }
+        }
+    },
+    "Modules":[
+        ".\\extensions.psm1"
+    ]
+}

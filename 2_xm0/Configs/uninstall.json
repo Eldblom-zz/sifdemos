@@ -1,0 +1,71 @@
+{
+    "Parameters": {
+        "Prefix": {
+            "Type": "string",
+            "Description": "Prefix used for sites, solr, databases etc"
+        },
+        "SqlAdminUser": {
+            "Type": "string",
+            "DefaultValue": "sa",
+            "Description": "The Sql admin user account to use when installing databases."
+        },
+        "SqlAdminPassword": {
+            "Type": "string",
+            "DefaultValue": "12345",
+            "Description": "The Sql admin password to use when installing databases."
+        },
+        "SqlServer": {
+            "Type": "string",
+            "DefaultValue": ".\\SQL2016",
+            "Description": "The Sql Server where databases will be installed."
+        }
+    },
+    "Variables": {
+        "All.With.Prefix": "[concat(parameter('Prefix'),'*')]",
+        "Install.Path": "[joinpath(environment('SystemDrive'), 'inetpub', 'wwwroot',variable('All.With.Prefix'))]",
+        "Sql.ConnectionString": "[sqlconnectionstring(parameter('SqlServer'), '', parameter('SqlAdminUser'), parameter('SqlAdminPassword'))]",
+        "Sql.DropDatabasesScript": "[resolvepath('..\\5_uninstall\\dropdatabases.sql')]"
+        
+    },
+    "Tasks": {
+        "RemoveWebsites": {
+            "Type": "RemoveWebsite",
+            "Params": {
+                "Name": "[variable('All.With.Prefix')]"
+            }
+        },
+        "RemoveAppPools": {
+            "Type": "RemoveWebAppPool",
+            "Params": {
+                "Name": "[variable('All.With.Prefix')]"
+            }
+        },
+        "RemoveServices": {
+            "Type": "RemoveService",
+            "Params": {
+                "Name": "[variable('All.With.Prefix')]"
+            }
+        },
+        "RemoveInstalledContent": {
+            "Type": "Remove",
+            "Params": {
+                "Path": "[variable('Install.Path')]",
+                "Recurse": true
+            }
+        },
+        "RemoveDatabases": {
+            "Type": "Sql",
+            "Params": {
+                "InputFile": "[variable('Sql.DropDatabasesScript')]",
+                "ConnectionString": "[variable('Sql.ConnectionString')]",
+                "Variable": "[concat('prefix=', parameter('prefix'), '%')]",
+                "OutputSqlErrors": true,
+                "Verbose": true
+            }
+        }
+    },
+    "Modules": [
+        "SqlServer",
+        "..\\5_uninstall\\extensions.psm1"
+    ]
+}

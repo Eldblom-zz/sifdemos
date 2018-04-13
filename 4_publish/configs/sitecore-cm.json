@@ -1,0 +1,51 @@
+{
+    "Parameters":{
+        "Package":{
+            "Type": "string",
+            "Description": "The path to the Sitecore package."
+        },
+        "SiteName":{
+            "Type": "string",
+            "DefaultValue": "sitecore.cm",
+            "Description": "The url of the content management site."
+        },
+        "SitePath":{
+            "Type": "string",
+            "DefaultValue": "c:\\inetpub\\wwwroot",
+            "Description": "The path to the content management site."
+        },
+        "PublishingUrl":{
+            "Type": "string",
+            "DefaultValue": "http://sc.publishing",
+            "Description": "The url to the publishing service."
+        }
+    },
+    "Variables":{
+        "Site.PhysicalPath": "[joinpath(parameter('SitePath'),parameter('SiteName'))]",
+        "Site.Url": "[concat('https://',parameter('SiteName'))]"
+    },
+    "Tasks":{
+        "InstallSitecorePackage":{
+            "Type": "InstallPackage",
+            "Params": {
+                "SiteFolder": "[variable('Site.PhysicalPath')]",
+                "SiteUrl": "[variable('Site.Url')]",
+                "PackagePath": "[parameter('Package')]"
+            }
+        },
+        "ConfigurePublishingModule": {
+            // Configures the shared session state provider
+            "Type": "SetXml",
+            "Params": [
+                { 
+                    "FilePath": "[joinpath(variable('Site.PhysicalPath'), 'App_Config/Modules/PublishingService/Sitecore.Publishing.Service.Config')]", 
+                    "Xpath":"/configuration/sitecore/settings/setting[@name='PublishingServiceUrlRoot']", 
+                    "Value": "[parameter('PublishingUrl')]"
+                }
+            ]
+        }
+    },
+    "Modules":[
+        ".\\extensions.psm1"
+    ]
+}

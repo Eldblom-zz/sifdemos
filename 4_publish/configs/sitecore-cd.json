@@ -1,0 +1,81 @@
+{
+    "Parameters":{
+        "Package":{
+            "Type": "string",
+            "Description": "The path to the Sitecore package."
+        },
+        "SiteName":{
+            "Type": "string",
+            "DefaultValue": "sitecore.cm",
+            "Description": "The url of the content management site."
+        },
+        "SitePath":{
+            "Type": "string",
+            "DefaultValue": "c:\\inetpub\\wwwroot",
+            "Description": "The path to the content management site."
+        },
+        "PublishingUrl":{
+            "Type": "string",
+            "DefaultValue": "http://sc.publishing",
+            "Description": "The url to the publishing service."
+        }
+    },
+    "Variables":{
+        "TempFolder": "./temp",
+        "Site.PhysicalPath": "[joinpath(parameter('SitePath'),parameter('SiteName'))]",
+        "Site.Url": "[concat('https://',parameter('SiteName'))]"
+    },
+    "Tasks":{
+        "CreateTempFolder":{
+            "Type": "EnsurePath",
+            "Params": {
+                "Clean": [ "[variable('TempFolder')]" ]
+            }
+        },
+        "ExtractPackage":{
+            "Type": "ExpandArchive",
+            "Params": {
+                "Path": "[parameter('Package')]",
+                "DestinationPath": "[variable('TempFolder')]"
+            }
+        },
+        "ExtractPackageContent":{
+            "Type": "ExpandArchive",
+            "Params": {
+                "Path": "[joinpath(variable('TempFolder'), '/package.zip')]",
+                "DestinationPath": "[variable('TempFolder')]"
+            }
+        },
+        "InstallModule":{
+            "Type": "Copy",
+            "Params": [
+                { "Source": "[joinpath(variable('TempFolder'), '/files/bin', 'Sitecore.Publishing.Service.dll')]", "Destination": "[joinpath(variable('Site.PhysicalPath'), '/bin')]" },
+                { "Source": "[joinpath(variable('TempFolder'), '/files/bin', 'Sitecore.Publishing.Service.Abstractions.dll')]", "Destination": "[joinpath(variable('Site.PhysicalPath'), '/bin')]" },
+                { "Source": "[joinpath(variable('TempFolder'), '/files/bin', 'Sitecore.Publishing.Service.Delivery.dll')]", "Destination": "[joinpath(variable('Site.PhysicalPath'), '/bin')]" }
+            ]
+        },
+        "CreateModuleConfiguration":{
+            "Type": "EnsurePath",
+            "Params": {
+                "Exists": "[joinpath(variable('Site.PhysicalPath'), '/App_Config/Module/PublishingService')]"            
+            }
+        },
+        "InstallModuleConfiguration":{
+            "Type": "Copy",
+            "Params": {
+                "Source": "[joinpath(variable('TempFolder'), '/files/App_Config/Modules/PublishingService', 'Sitecore.Publishing.Service.Delivery.config')]",
+                "Destination": "[joinpath(variable('Site.PhysicalPath'), '/App_Config/Module/PublishingService')]"
+            }
+        },
+        "Cleanup":{
+            "Type": "Remove",
+            "Params": {
+                "Path": "[variable('TempFolder')]",
+                "Recurse": true
+            }
+        }
+    },
+    "Modules":[
+        ".\\extensions.psm1"
+    ]
+}

@@ -1,0 +1,6 @@
+/license.xml
+*.crt
+*.ttf
+*.otf
+*.log
+**/Packages/*.zip
