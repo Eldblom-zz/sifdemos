@@ -4,3 +4,4 @@
 *.otf
 *.log
 **/Packages/*.zip
+**/Packages/*/

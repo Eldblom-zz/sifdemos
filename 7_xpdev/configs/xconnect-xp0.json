@@ -328,7 +328,7 @@
             }
         },
         "DisableEnforceSSL": {
-            // Disables HTTP
+            // Disables HTTPS
             "Type": "Rename",
             "Params": {
                 "Path": "[joinpath(variable('Site.PhysicalPath'), 'App_data/config/sitecore/CoreServices/sc.XConnect.Security.EnforceSSL.xml')]",
