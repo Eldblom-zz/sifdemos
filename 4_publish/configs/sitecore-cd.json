@@ -57,14 +57,14 @@
         "CreateModuleConfiguration":{
             "Type": "EnsurePath",
             "Params": {
-                "Exists": "[joinpath(variable('Site.PhysicalPath'), '/App_Config/Module/PublishingService')]"            
+                "Exists": "[joinpath(variable('Site.PhysicalPath'), '/App_Config/Modules/PublishingService')]"            
             }
         },
         "InstallModuleConfiguration":{
             "Type": "Copy",
             "Params": {
                 "Source": "[joinpath(variable('TempFolder'), '/files/App_Config/Modules/PublishingService', 'Sitecore.Publishing.Service.Delivery.config')]",
-                "Destination": "[joinpath(variable('Site.PhysicalPath'), '/App_Config/Module/PublishingService')]"
+                "Destination": "[joinpath(variable('Site.PhysicalPath'), '/App_Config/Modules/PublishingService')]"
             }
         },
         "Cleanup":{
